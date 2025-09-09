@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Item Expiry Tracker</title>
+  <meta name="description" content="Track item expiries by month and year with a rotating calendar. Add, edit, delete, import, and export items. Data is saved to your browser.">
+  <style>
+    :root {
+      /* Brand palette */
+      --ink-1:#121212;  /* deep black */
+      --ink-2:#1c1c1c;  /* panel */
+      --ink-3:#2a2a2a;  /* card */
+      --ink-4:#3a3a3a;  /* borders */
+      --muted:#a7a7a7;  /* secondary text */
+      --text:#f5f5f5;   /* main text */
+      --accent:#ff69b4; /* pink primary */
+      --accent-2:#ff1493; /* deeper pink */
+      --ok:#4caf50;    /* success */
+      --warn:#ff9800;  /* warning */
+      --danger:#ef4444;/* danger */
+      --bg:linear-gradient(135deg, var(--ink-1) 0%, var(--ink-2) 100%);
+      --bg-2:linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+      --radius:18px;
+      --radius-sm:12px;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --shadow-soft:0 6px 18px rgba(0,0,0,.25);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: var(--bg);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 18px;
+    }
+    .title {
+      font-size: clamp(20px, 2.6vw, 32px);
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .pill {
+      font-size: 12px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .card {
+      background: var(--ink-3);
+      border: 1px solid var(--ink-4);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card-pad { padding: 16px; }
+    .row { display:flex; gap: 16px; flex-wrap: wrap; }
+    .grow { flex: 1 1 300px; }
+
+    /* Controls */
+    .controls { display:flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .btn {
+      appearance: none; border: none; cursor: pointer; user-select: none;
+      padding: 10px 14px; border-radius: 12px; font-weight: 700; letter-spacing: .2px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: white; box-shadow: var(--shadow-soft);
+      transition: transform .08s ease, box-shadow .2s ease, filter .15s ease;
+    }
+    .btn:hover { filter: brightness(1.05); }
+    .btn:active { transform: translateY(1px); }
+    .btn.outline { background: transparent; color: var(--text); border: 1px solid var(--ink-4); }
+    .btn.ghost { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); color: var(--text); }
+    .btn.small { padding: 8px 12px; font-size: 13px; border-radius: 10px; }
+
+    .switch {
+      display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted);
+    }
+    .switch input { display:none; }
+    .toggle {
+      width: 44px; height: 26px; background: var(--ink-4); border-radius: 999px; position: relative; transition: background .2s ease;
+    }
+    .knob {
+      position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white;
+      transition: left .2s ease;
+    }
+    .toggle.active { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); }
+    .toggle.active .knob { left: 21px; }
+
+    /* Month carousel */
+    .carousel {
+      display:flex; align-items:center; gap:12px; padding: 10px; overflow: hidden;
+    }
+    .carousel .arrow { width:38px; height:38px; border-radius: 50%; display:grid; place-items:center; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); cursor:pointer; }
+    .months { display:flex; gap:10px; flex: 1; justify-content: center; align-items:center; }
+    .month {
+      min-width: 110px; text-align:center; padding: 10px 12px; border-radius: 12px;
+      background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color: var(--muted);
+      transform: scale(.96); transition: transform .15s ease, background .2s ease, color .2s ease, border-color .2s ease;
+      user-select:none;
+    }
+    .month.active {
+      background: linear-gradient(135deg, rgba(255,105,180,.18), rgba(255,20,147,.18));
+      color: var(--text); border-color: rgba(255,20,147,.35); transform: scale(1);
+    }
+    .yearBadge { font-size: 11px; opacity:.8; display:block; margin-top: 4px; }
+
+    /* Form */
+    form label { font-size: 12px; color: var(--muted); display:block; margin-bottom:6px; }
+    form input, form select {
+      width: 100%; padding: 10px 12px; background: #1d1d1d; color: var(--text); border: 1px solid var(--ink-4);
+      border-radius: 10px; outline:none; transition: border-color .15s ease, background .15s ease;
+    }
+    form input:focus, form select:focus { border-color: var(--accent); }
+
+    /* Table */
+    table { width:100%; border-collapse: collapse; }
+    thead th { text-align:left; font-size: 12px; color: var(--muted); font-weight: 700; padding: 10px 12px; border-bottom:1px solid var(--ink-4); position:sticky; top:0; background: var(--ink-3); z-index:1; }
+    tbody td { padding: 12px; border-bottom: 1px solid var(--ink-4); vertical-align: top; }
+    tbody tr:hover { background: rgba(255,255,255,.03); }
+    .badge { display:inline-block; font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); color: var(--text); background: rgba(255,255,255,.06); }
+    .muted { color: var(--muted); }
+    .qty { font-weight: 800; }
+
+    .grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    @media (max-width: 860px){ .grid-2 { grid-template-columns: 1fr; } }
+
+    .footer { display:flex; justify-content: space-between; gap:12px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 12px; }
+
+    /* Dialog */
+    dialog { border: none; padding: 0; border-radius: var(--radius); background: var(--ink-3); color: var(--text); box-shadow: var(--shadow); width: min(680px, calc(100vw - 40px)); }
+    dialog::backdrop { background: rgba(0,0,0,.55); }
+    .dialog-header { display:flex; align-items:center; justify-content: space-between; padding: 14px 16px; border-bottom:1px solid var(--ink-4); }
+    .dialog-body { padding: 16px; }
+
+    .sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">📦 Item Expiry Tracker <span class="pill">Local only • Auto‑save</span></div>
+      <div class="controls">
+        <button class="btn small" id="addQuick">+ Quick Add</button>
+        <button class="btn small ghost" id="importCsv">Import CSV</button>
+        <button class="btn small ghost" id="importDictCsv">Import Dict CSV</button>
+        <button class="btn small ghost" id="importExcel">Import Excel</button>
+        <button class="btn small ghost" id="exportCsv">Export CSV</button>
+        <label class="switch">
+          <input type="checkbox" id="toggleTheme" checked>
+          <span class="toggle active" id="toggleVis"><span class="knob"></span></span>
+          <span>Dark mode</span>
+        </label>
+      </div>
+    </header>
+
+    <!-- Rotating Month Carousel -->
+    <section class="card">
+      <div class="card-pad carousel">
+        <button class="arrow" id="prevMonth" title="Previous month" aria-label="Previous month">◀</button>
+        <div class="months" id="monthStrip" aria-live="polite"></div>
+        <button class="arrow" id="nextMonth" title="Next month" aria-label="Next month">▶</button>
+      </div>
+    </section>
+
+    <div style="height: 14px"></div>
+
+    <!-- Add / Edit Form -->
+    <section class="row">
+      <div class="card grow">
+        <div class="card-pad">
+          <h2 style="margin:0 0 10px; font-size:18px">Add / Edit Item</h2>
+          <form id="itemForm" class="grid-2">
+            <div>
+              <label for="desc">Item Description</label>
+              <input id="desc" name="desc" autocomplete="off" required placeholder="e.g., Vitamin C Gummies 90ct" list="itemList" />
+            </div>
+            <div>
+              <label for="sku">Item SKU</label>
+              <input id="sku" name="sku" autocomplete="off" placeholder="e.g., VITC-90" list="skuList" />
+            </div>
+            <div>
+              <label for="number">Item Number</label>
+              <input id="number" name="number" autocomplete="off" required placeholder="e.g., 100234" list="numList" />
+            </div>
+            <div>
+              <label for="location">Item Location</label>
+              <select id="location" name="location">
+                <option value="">Select Location...</option>
+                ${Array.isArray(DICT.stores) ? DICT.stores.map(store => 
+                  `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`
+                ).join('') : ''}
+              </select>
+            </div>
+            <div>
+              <label for="units">Units Expiring</label>
+              <input id="units" name="units" type="number" min="0" step="1" inputmode="numeric" required placeholder="e.g., 12" />
+            </div>
+            <div>
+              <label for="expiry">Expiry (Month & Year)</label>
+              <input id="expiry" name="expiry" type="month" required />
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button class="btn" type="submit" id="saveBtn">Save Item</button>
+              <button class="btn outline" type="reset" id="resetBtn">Reset</button>
+              <span class="muted" id="formHint">&nbsp;</span>
+            </div>
+            <input type="hidden" id="editId" value="" />
+          </form>
+        </div>
+      </div>
+
+      <!-- Filters / Stats -->
+      <div class="card" style="flex: 1 1 260px; max-width: 460px;">
+        <div class="card-pad">
+          <h2 style="margin:0 0 10px; font-size:18px">Filters & Stats</h2>
+          <div class="grid-2">
+            <div>
+              <label for="search">Search</label>
+              <input id="search" placeholder="Find by text…" />
+            </div>
+            <div>
+              <label for="filterLocation">Location</label>
+              <input id="filterLocation" placeholder="Filter by location…" />
+            </div>
+          </div>
+          <div style="height:10px"></div>
+          <div class="grid-2">
+            <div>
+              <label for="filterMonth">Filter Month</label>
+              <input id="filterMonth" type="month" />
+            </div>
+            <div>
+              <label for="minUnits">Min Units</label>
+              <input id="minUnits" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g., 5" />
+            </div>
+          </div>
+          <div style="height:10px"></div>
+          <div class="footer">
+            <div>
+              <span class="muted">Showing</span> <span class="qty" id="visibleCount">0</span> <span class="muted">of</span> <span class="qty" id="totalCount">0</span>
+            </div>
+            <div>
+              <button class="btn small ghost" id="clearAll">Clear All Data</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height: 14px"></div>
+
+    <!-- Table of items -->
+    <section class="card">
+      <div class="card-pad" style="padding-bottom: 0;">
+        <div style="display:flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <h2 style="margin:0; font-size:18px">Items Expiring <span class="muted" id="activeScope"></span></h2>
+          <div class="controls">
+            <button class="btn small ghost" id="groupByMonth">Group by Month</button>
+            <button class="btn small ghost" id="groupByLocation">Group by Location</button>
+            <button class="btn small ghost" id="clearGrouping">Clear Grouping</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-pad" style="max-height: 50vh; overflow: auto;">
+        <table id="itemsTable" aria-describedby="activeScope">
+          <thead>
+            <tr>
+              <th>Item Description</th>
+              <th>SKU</th>
+              <th>Item #</th>
+              <th>Location</th>
+              <th style="text-align:right">Units</th>
+              <th>Expiry</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div style="height: 18px"></div>
+
+    <footer class="footer">
+      <div>© 2025 Andrew Calabrese. All rights reserved.</div>
+      <div>Tip: Use the month carousel to change the scope; the table follows automatically.</div>
+    </footer>
+  </div>
+
+  <!-- Quick Add Dialog -->
+  <dialog id="quickDlg" aria-labelledby="quickTitle">
+    <div class="dialog-header">
+      <strong id="quickTitle">Quick Add</strong>
+      <button class="btn small outline" id="closeQuick">Close</button>
+    </div>
+    <div class="dialog-body">
+      <form id="quickForm" class="grid-2">
+        <div>
+          <label for="qdesc">Item Description</label>
+          <input id="qdesc" required list="itemList" />
+        </div>
+        <div>
+          <label for="qsku">Item SKU</label>
+          <input id="qsku" list="skuList" />
+        </div>
+        <div>
+          <label for="qnumber">Item Number</label>
+          <input id="qnumber" required list="numList" />
+        </div>
+        <div>
+          <label for="qlocation">Location</label>
+          <select id="qlocation">
+            <option value="">Select Location...</option>
+          </select>
+          <script>
+            // Populate location dropdown
+            const qlocSelect = document.getElementById('qlocation');
+            if (Array.isArray(DICT.stores)) {
+              DICT.stores.forEach(store => {
+                const opt = document.createElement('option');
+                opt.value = store;
+                opt.textContent = store;
+                qlocSelect.appendChild(opt);
+              });
+            }
+          </script>
+        </div>
+        <div>
+          <label for="qunits">Units</label>
+          <input id="qunits" type="number" min="0" step="1" required />
+        </div>
+        <div>
+          <label for="qexpiry">Expiry</label>
+          <input id="qexpiry" type="month" required />
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button class="btn" type="submit">Add</button>
+          <button class="btn outline" type="reset">Reset</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <input id="filePicker" type="file" accept="text/csv,.csv" class="sr" />
+  <input id="excelPicker" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="sr" />
+  <input id="dictCsvPicker" type="file" accept="text/csv,.csv" class="sr" />
+  <datalist id="itemList"></datalist>
+  <datalist id="storeList"></datalist>
+  <datalist id="skuList"></datalist>
+  <datalist id="numList"></datalist>
+
+  <!-- Optional: prebuilt dictionaries file. If present, it will be used. -->
+  <script src="dictionaries.js"></script>
+  <!-- Excel parser for in-browser import (SheetJS) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script>
+    /***************************
+     * Storage + State
+     ***************************/
+    const STORAGE_KEY = 'expiryTrackerDataV1';
+    const THEME_KEY = 'expiryTrackerTheme';
+    const DICT_KEY = 'expiryTrackerDictV1';
+
+    /** @type {Array<{id:string, desc:string, sku:string, number:string, location:string, units:number, y:number, m:number}>} */
+    let DATA = [];
+
+    const state = {
+      viewYear: new Date().getFullYear(),
+      viewMonth: new Date().getMonth(), // 0-11
+      text: '', location: '', minUnits: 0, filterMonth: null,
+      groupBy: null // 'month' | 'location' | null
+    };
+
+    function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+
+    // Optional external dictionary loaded by script tag
+    let DICT = { items: [], stores: [] };
+
+    async function loadStoreList() {
+      try {
+        const response = await fetch('Store List.csv');
+        const text = await response.text();
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        // Skip the header line "Store List" and filter out any empty lines
+        const stores = lines.slice(1).filter(Boolean);
+        DICT.stores = stores;  // Replace any existing stores with the CSV list
+      } catch(e) {
+        console.warn('Could not load Store List.csv:', e);
+      }
+    }
+
+    async function load() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        DATA = raw ? JSON.parse(raw) : [];
+      } catch(e){ DATA = []; }
+      try {
+        const draw = localStorage.getItem(DICT_KEY);
+        if (draw) DICT = JSON.parse(draw) || DICT;
+      } catch(e){ /* ignore */ }
+      if (window.DICT) {
+        // Prefer file-provided dictionary when available
+        const w = window.DICT || {};
+        if (Array.isArray(w.items) && w.items.length) DICT.items = w.items;
+      }
+      await loadStoreList();  // Load stores from CSV
+      const t = localStorage.getItem(THEME_KEY);
+      if (t === 'light') setTheme(false); else setTheme(true);
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA));
+      rebuildLookups();
+    }
+
+    /***************************
+     * Theme
+     ***************************/
+    const themeCheckbox = document.getElementById('toggleTheme');
+    const toggleVis = document.getElementById('toggleVis');
+    themeCheckbox.addEventListener('change', () => setTheme(themeCheckbox.checked));
+    function setTheme(dark) {
+      if (dark) {
+        document.documentElement.style.setProperty('--bg', 'linear-gradient(135deg, var(--ink-1) 0%, var(--ink-2) 100%)');
+        toggleVis.classList.add('active');
+        localStorage.setItem(THEME_KEY, 'dark');
+        themeCheckbox.checked = true;
+      } else {
+        document.documentElement.style.setProperty('--bg', 'var(--bg-2)');
+        toggleVis.classList.remove('active');
+        localStorage.setItem(THEME_KEY, 'light');
+        themeCheckbox.checked = false;
+      }
+    }
+
+    /***************************
+     * Month helpers
+     ***************************/
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function incMonth(year, month, delta){
+      let idx = year * 12 + month + delta;
+      return { year: Math.floor(idx / 12), month: (idx % 12 + 12) % 12 };
+    }
+
+    function toYYYYMM(y, m){ return `${y}-${String(m+1).padStart(2,'0')}`; }
+
+    /***************************
+     * Carousel
+     ***************************/
+    const strip = document.getElementById('monthStrip');
+    const prevBtn = document.getElementById('prevMonth');
+    const nextBtn = document.getElementById('nextMonth');
+
+    function renderCarousel(){
+      strip.innerHTML = '';
+      // Show 7 tiles: 3 prev, current, 3 next
+      for (let d=-3; d<=3; d++){
+        const {year, month} = incMonth(state.viewYear, state.viewMonth, d);
+        const div = document.createElement('div');
+        div.className = 'month' + (d===0 ? ' active' : '');
+        div.innerHTML = `<div style="font-weight:800; font-size:14px">${MONTHS[month]}</div><span class="yearBadge">${year}</span>`;
+        div.onclick = () => { state.viewYear = year; state.viewMonth = month; onScopeChanged(); };
+        strip.appendChild(div);
+      }
+      document.getElementById('activeScope').textContent = `for ${MONTHS[state.viewMonth]} ${state.viewYear}`;
+    }
+
+    prevBtn.addEventListener('click', () => { const r = incMonth(state.viewYear, state.viewMonth, -1); state.viewYear=r.year; state.viewMonth=r.month; onScopeChanged(); });
+    nextBtn.addEventListener('click', () => { const r = incMonth(state.viewYear, state.viewMonth, +1); state.viewYear=r.year; state.viewMonth=r.month; onScopeChanged(); });
+
+    function onScopeChanged(){
+      renderCarousel();
+      renderTable();
+      const fm = document.getElementById('filterMonth');
+      fm.value = '';
+      state.filterMonth = null;
+    }
+
+    /***************************
+     * Form & CRUD
+     ***************************/
+    const form = document.getElementById('itemForm');
+    const hint = document.getElementById('formHint');
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const payload = getFormPayload();
+      if (!payload) return;
+      const editing = document.getElementById('editId').value;
+      if (editing){
+        const idx = DATA.findIndex(x => x.id === editing);
+        if (idx !== -1) DATA[idx] = { ...DATA[idx], ...payload };
+        document.getElementById('editId').value='';
+        hint.textContent = 'Updated';
+      } else {
+        DATA.push({ id: uid(), ...payload });
+        hint.textContent = 'Added';
+      }
+      save();
+      form.reset();
+      renderTable();
+      setTimeout(()=> hint.textContent = '\u00A0', 1200);
+    });
+
+    function getFormPayload(){
+      const desc = document.getElementById('desc').value.trim();
+      const sku = document.getElementById('sku').value.trim();
+      const number = document.getElementById('number').value.trim();
+      const location = document.getElementById('location').value.trim();
+      const units = parseInt(document.getElementById('units').value, 10);
+      const expiry = document.getElementById('expiry').value; // yyyy-mm
+      if (!desc || !number || !expiry || Number.isNaN(units)) return null;
+      const [y,m] = expiry.split('-').map(n=>parseInt(n,10));
+      return { desc, sku, number, location, units, y:y, m:m-1 };
+    }
+
+    function editItem(id){
+      const it = DATA.find(x=>x.id===id); if (!it) return;
+      document.getElementById('desc').value = it.desc;
+      document.getElementById('sku').value = it.sku || '';
+      document.getElementById('number').value = it.number;
+      document.getElementById('location').value = it.location || '';
+      document.getElementById('units').value = it.units;
+      document.getElementById('expiry').value = toYYYYMM(it.y, it.m);
+      document.getElementById('editId').value = it.id;
+      hint.textContent = 'Editing…';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteItem(id){
+      if (!confirm('Delete this item?')) return;
+      DATA = DATA.filter(x=>x.id!==id);
+      save();
+      renderTable();
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      document.getElementById('editId').value='';
+      hint.textContent='\u00A0';
+    });
+
+    /***************************
+     * Filters & Grouping
+     ***************************/
+    document.getElementById('search').addEventListener('input', e=>{ state.text = e.target.value.toLowerCase(); renderTable(); });
+    document.getElementById('filterLocation').addEventListener('input', e=>{ state.location = e.target.value.toLowerCase(); renderTable(); });
+    document.getElementById('minUnits').addEventListener('input', e=>{ state.minUnits = parseInt(e.target.value || '0',10); renderTable(); });
+    document.getElementById('filterMonth').addEventListener('change', e=>{
+      const v = e.target.value; // yyyy-mm or ''
+      state.filterMonth = v ? v : null;
+      renderTable();
+    });
+
+    document.getElementById('groupByMonth').addEventListener('click', ()=>{ state.groupBy='month'; renderTable(); });
+    document.getElementById('groupByLocation').addEventListener('click', ()=>{ state.groupBy='location'; renderTable(); });
+    document.getElementById('clearGrouping').addEventListener('click', ()=>{ state.groupBy=null; renderTable(); });
+
+    /***************************
+     * Import / Export
+     ***************************/
+    const picker = document.getElementById('filePicker');
+    document.getElementById('importCsv').addEventListener('click', ()=> picker.click());
+    picker.addEventListener('change', async (e)=>{
+      const file = e.target.files?.[0]; if (!file) return;
+      const text = await file.text();
+      const rows = parseCSV(text);
+      let added = 0;
+      for (const r of rows){
+        const desc=r['Item Description']||r['desc']||r['description']||'';
+        const sku=r['Item SKU']||r['sku']||'';
+        const number=r['Item Number']||r['number']||'';
+        const location=r['Item Location']||r['location']||'';
+        const units=parseInt((r['Units Expiring']||r['units']||'0'),10) || 0;
+        const mm=(r['Expiry Month']||r['expiry']||r['Expiry']||'').trim(); // try yyyy-mm or Mon YYYY
+        if (!desc || !number || !mm) continue;
+        let y,m;
+        if (/^\d{4}-\d{2}$/.test(mm)){
+          [y,m] = mm.split('-').map(n=>parseInt(n,10));
+          m = m-1;
+        } else {
+          const d = new Date(mm);
+          if (!isNaN(d)){ y = d.getFullYear(); m = d.getMonth(); }
+        }
+        if (y && m>=0){ DATA.push({ id: uid(), desc, sku, number, location, units, y, m }); added++; }
+      }
+      save(); renderTable(); alert(`Imported ${added} items`);
+      picker.value = '';
+    });
+
+    document.getElementById('exportCsv').addEventListener('click', ()=>{
+      const head = ['Item Description','Item SKU','Item Number','Item Location','Units Expiring','Expiry Month'];
+      const lines = [head.join(',')];
+      DATA.forEach(r=>{
+        const row = [r.desc, r.sku||'', r.number, r.location||'', r.units, toYYYYMM(r.y,r.m)];
+        lines.push(row.map(s=>csvEscape(String(s))).join(','));
+      });
+      const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `expiry-items-${Date.now()}.csv`; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    function csvEscape(s){ return /[",\n]/.test(s) ? '"'+s.replaceAll('"','""')+'"' : s; }
+
+    function parseCSV(text){
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+      const headers = splitCSVLine(lines[0]).map(h=>h.trim());
+      const out = [];
+      for (let i=1;i<lines.length;i++){
+        const cols = splitCSVLine(lines[i]);
+        const row = {};
+        headers.forEach((h,idx)=> row[h] = (cols[idx]||'').trim());
+        out.push(row);
+      }
+      return out;
+    }
+    function splitCSVLine(line){
+      const out=[]; let i=0; let cur=''; let inQ=false;
+      while(i<line.length){
+        const ch=line[i];
+        if (inQ){
+          if (ch==='"' && line[i+1]==='"'){ cur+='"'; i+=2; continue; }
+          if (ch==='"'){ inQ=false; i++; continue; }
+          cur+=ch; i++; continue;
+        } else {
+          if (ch==='"'){ inQ=true; i++; continue; }
+          if (ch===','){ out.push(cur); cur=''; i++; continue; }
+          cur+=ch; i++; continue;
+        }
+      }
+      out.push(cur);
+      return out;
+    }
+
+    /***************************
+     * Table render
+     ***************************/
+    const bodyEl = document.getElementById('itemsBody');
+    const totalCount = document.getElementById('totalCount');
+    const visibleCount = document.getElementById('visibleCount');
+
+    // Datalists & lookups
+    const itemList = document.getElementById('itemList');
+    const storeList = document.getElementById('storeList');
+    const skuList = document.getElementById('skuList');
+    const numList = document.getElementById('numList');
+    let LOOKUP_BY_DESC = new Map();
+    let LOOKUP_BY_SKU = new Map();
+    let LOOKUP_BY_NUM = new Map();
+
+    function rebuildLookups(){
+      // Build stores: union of dictionary + existing data
+      const dictStores = Array.isArray(DICT.stores) ? DICT.stores : [];
+      const dataStores = [...new Set(DATA.map(x => (x.location||'').trim()).filter(Boolean))];
+      const stores = [...new Set([...dictStores, ...dataStores])].filter(Boolean).sort((a,b)=> a.localeCompare(b));
+      storeList.innerHTML = stores.map(s => `<option value="${escapeHtml(String(s))}">`).join('');
+
+      // Build items: prefer dictionary, then fill gaps from data
+      const byDesc = new Map();
+      const bySku = new Map();
+      const byNum = new Map();
+      const addItem = (desc, sku, number)=>{
+        const key = String(desc||'').trim(); if (!key) return;
+        const skuK = String(sku||'').trim();
+        const numK = String(number||'').trim();
+        const k = key.toLowerCase();
+        const obj = { desc: key, sku: String(sku||''), number: String(number||'') };
+        if (!byDesc.has(k)) byDesc.set(k, obj);
+        if (skuK){ const sk = skuK.toLowerCase(); if (!bySku.has(sk)) bySku.set(sk, obj); }
+        if (numK){ const nk = numK.toLowerCase(); if (!byNum.has(nk)) byNum.set(nk, obj); }
+      };
+      if (Array.isArray(DICT.items)) {
+        for (const it of DICT.items){ addItem(it.desc, it.sku, it.number); }
+      }
+      for (const it of DATA){ addItem(it.desc, it.sku, it.number); }
+      const items = [...byDesc.values()].sort((a,b)=> a.desc.localeCompare(b.desc));
+      itemList.innerHTML = items.map(it => `<option value="${escapeHtml(it.desc)}">`).join('');
+      const skuVals = [...new Set(items.map(it=> (it.sku||'').trim()).filter(Boolean))].sort((a,b)=> a.localeCompare(b));
+      const numVals = [...new Set(items.map(it=> (it.number||'').trim()).filter(Boolean))].sort((a,b)=> a.localeCompare(b));
+      skuList.innerHTML = skuVals.map(v=> `<option value="${escapeHtml(v)}">`).join('');
+      numList.innerHTML = numVals.map(v=> `<option value="${escapeHtml(v)}">`).join('');
+      LOOKUP_BY_DESC = byDesc; LOOKUP_BY_SKU = bySku; LOOKUP_BY_NUM = byNum;
+    }
+
+    function fillAll(descInputId, skuInputId, numberInputId, meta){
+      if (!meta) return;
+      const dEl = document.getElementById(descInputId);
+      const sEl = document.getElementById(skuInputId);
+      const nEl = document.getElementById(numberInputId);
+      if (dEl) dEl.value = meta.desc || '';
+      if (sEl) sEl.value = meta.sku || '';
+      if (nEl) nEl.value = meta.number || '';
+    }
+
+    function autofillFromDesc(descInputId, skuInputId, numberInputId){
+      const val = document.getElementById(descInputId).value.trim().toLowerCase();
+      const meta = LOOKUP_BY_DESC.get(val);
+      fillAll(descInputId, skuInputId, numberInputId, meta);
+    }
+
+    function autofillFromSku(skuInputId, descInputId, numberInputId){
+      const val = document.getElementById(skuInputId).value.trim().toLowerCase();
+      const meta = LOOKUP_BY_SKU.get(val);
+      fillAll(descInputId, skuInputId, numberInputId, meta);
+    }
+
+    function autofillFromNumber(numInputId, descInputId, skuInputId){
+      const val = document.getElementById(numInputId).value.trim().toLowerCase();
+      const meta = LOOKUP_BY_NUM.get(val);
+      fillAll(descInputId, skuInputId, numInputId, meta);
+    }
+
+    // Autofill on description selection
+    document.getElementById('desc').addEventListener('change', ()=> autofillFromDesc('desc','sku','number'));
+    document.getElementById('sku').addEventListener('change', ()=> autofillFromSku('sku','desc','number'));
+    document.getElementById('number').addEventListener('change', ()=> autofillFromNumber('number','desc','sku'));
+    document.getElementById('qdesc').addEventListener('change', ()=> autofillFromDesc('qdesc','qsku','qnumber'));
+    document.getElementById('qsku').addEventListener('change', ()=> autofillFromSku('qsku','qdesc','qnumber'));
+    document.getElementById('qnumber').addEventListener('change', ()=> autofillFromNumber('qnumber','qdesc','qsku'));
+
+    function matchesFilters(it){
+      const textOk = !state.text || (
+        it.desc.toLowerCase().includes(state.text) ||
+        (it.sku||'').toLowerCase().includes(state.text) ||
+        it.number.toLowerCase().includes(state.text) ||
+        (it.location||'').toLowerCase().includes(state.text)
+      );
+      const locOk = !state.location || (it.location||'').toLowerCase().includes(state.location);
+      const unitsOk = (state.minUnits||0) <= it.units;
+      let monthOk = true;
+      if (state.filterMonth){
+        const [y,m]=state.filterMonth.split('-').map(n=>parseInt(n,10));
+        monthOk = (it.y===y && it.m===m-1);
+      } else {
+        monthOk = (it.y===state.viewYear && it.m===state.viewMonth);
+      }
+      return textOk && locOk && unitsOk && monthOk;
+    }
+
+    function renderTable(){
+      const filtered = DATA.filter(matchesFilters);
+      totalCount.textContent = DATA.length;
+      visibleCount.textContent = filtered.length;
+
+      bodyEl.innerHTML = '';
+
+      if (state.groupBy === 'month'){
+        const groups = groupBy(filtered, x=> `${x.y}-${x.m}`);
+        const keys = [...groups.keys()].sort((a,b)=> a.localeCompare(b));
+        for (const k of keys){
+          const [y,m] = k.split('-').map(n=>parseInt(n,10));
+          bodyEl.appendChild(groupRow(`${MONTHS[m]} ${y}`, sumUnits(groups.get(k))));
+          groups.get(k).forEach(it=> bodyEl.appendChild(itemRow(it)) );
+        }
+      } else if (state.groupBy === 'location'){
+        const groups = groupBy(filtered, x=> (x.location||'Unspecified'));
+        const keys = [...groups.keys()].sort((a,b)=> a.localeCompare(b));
+        for (const k of keys){
+          bodyEl.appendChild(groupRow(`${k}`, sumUnits(groups.get(k))));
+          groups.get(k).forEach(it=> bodyEl.appendChild(itemRow(it)) );
+        }
+      } else {
+        filtered
+          .sort((a,b)=> a.desc.localeCompare(b.desc) || a.number.localeCompare(b.number))
+          .forEach(it=> bodyEl.appendChild(itemRow(it)));
+      }
+    }
+
+    function sumUnits(arr){ return arr.reduce((t,x)=> t + (x.units||0), 0); }
+    function groupBy(arr, keyFn){ const m=new Map(); for (const it of arr){ const k=keyFn(it); if (!m.has(k)) m.set(k, []); m.get(k).push(it);} return m; }
+
+    function groupRow(label, total){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="7" style="position:relative;">
+        <div style="display:flex; align-items:center; justify-content: space-between; gap:10px; padding: 6px 0;">
+          <div class="badge">${label}</div>
+          <div class="muted">Total units: <span class="qty">${total}</span></div>
+        </div>
+      </td>`;
+      return tr;
+    }
+
+    function itemRow(it){
+      const tr = document.createElement('tr');
+
+      function renderRead(){
+        tr.innerHTML = `
+          <td>${escapeHtml(it.desc)}</td>
+          <td>${escapeHtml(it.sku || '')}</td>
+          <td>${escapeHtml(it.number)}</td>
+          <td>${escapeHtml(it.location || '')}</td>
+          <td style="text-align:right" class="qty">${it.units}</td>
+          <td><span class="badge">${MONTHS[it.m]} ${it.y}</span></td>
+          <td>
+            <div style="display:flex; gap:8px;">
+              <button class="btn small ghost" data-action="edit">Edit</button>
+              <button class="btn small outline" data-action="del">Delete</button>
+            </div>
+          </td>`;
+        tr.querySelector('[data-action="edit"]').addEventListener('click', ()=> renderEdit());
+        tr.querySelector('[data-action="del"]').addEventListener('click', ()=> deleteItem(it.id));
+      }
+
+      function renderEdit(){
+        const base = it.id;
+        const idDesc = `desc-${base}`;
+        const idSku = `sku-${base}`;
+        const idNum = `number-${base}`;
+        const idLoc = `location-${base}`;
+        const idUnits = `units-${base}`;
+        const idExp = `expiry-${base}`;
+        tr.innerHTML = `
+          <td>
+            <select id="${idDesc}" style="width:100%;">
+              <option value="">Select Item...</option>
+              ${[...LOOKUP_BY_DESC.values()]
+                .sort((a,b) => a.desc.localeCompare(b.desc))
+                .map(item => `<option value="${escapeHtml(item.desc)}" ${item.desc === it.desc ? 'selected' : ''}>${escapeHtml(item.desc)}</option>`)
+                .join('')}
+            </select>
+          </td>
+          <td>
+            <select id="${idSku}" style="width:100%;">
+              <option value="">Select SKU...</option>
+              ${[...new Set([...LOOKUP_BY_SKU.values()].map(item => item.sku))]
+                .filter(Boolean)
+                .sort()
+                .map(sku => `<option value="${escapeHtml(sku)}" ${sku === it.sku ? 'selected' : ''}>${escapeHtml(sku)}</option>`)
+                .join('')}
+            </select>
+          </td>
+          <td>
+            <select id="${idNum}" style="width:100%;">
+              <option value="">Select Item Number...</option>
+              ${[...new Set([...LOOKUP_BY_NUM.values()].map(item => item.number))]
+                .filter(Boolean)
+                .sort()
+                .map(num => `<option value="${escapeHtml(num)}" ${num === it.number ? 'selected' : ''}>${escapeHtml(num)}</option>`)
+                .join('')}
+            </select>
+          </td>
+          <td>
+            <select id="${idLoc}" style="width:100%;">
+              <option value="">Select Location...</option>
+              ${[...new Set([
+                ...(Array.isArray(DICT.stores) ? DICT.stores : []),
+                ...DATA.map(x => x.location)
+              ].filter(Boolean))]
+                .sort()
+                .map(loc => `<option value="${escapeHtml(loc)}" ${loc === it.location ? 'selected' : ''}>${escapeHtml(loc)}</option>`)
+                .join('')}
+            </select>
+          </td>
+          <td style="text-align:right"><input id="${idUnits}" type="number" min="0" step="1" value="${it.units}" style="width:90px; text-align:right;" /></td>
+          <td><input id="${idExp}" type="month" value="${toYYYYMM(it.y,it.m)}" /></td>
+          <td>
+            <div style="display:flex; gap:8px;">
+              <button class="btn small" data-action="save">Save</button>
+              <button class="btn small outline" data-action="cancel">Cancel</button>
+              <button class="btn small outline" data-action="del">Delete</button>
+            </div>
+          </td>`;
+
+        // Inline autofill by any identifier
+        const hook = (id, fn)=>{ const el = document.getElementById(id); if (el) el.addEventListener('change', fn); };
+        hook(idDesc, ()=> autofillFromDesc(idDesc, idSku, idNum));
+        hook(idSku, ()=> autofillFromSku(idSku, idDesc, idNum));
+        hook(idNum, ()=> autofillFromNumber(idNum, idDesc, idSku));
+
+        tr.querySelector('[data-action="save"]').addEventListener('click', ()=>{
+          const d = document.getElementById(idDesc).value.trim();
+          const s = document.getElementById(idSku).value.trim();
+          const n = document.getElementById(idNum).value.trim();
+          const l = document.getElementById(idLoc).value.trim();
+          const u = parseInt(document.getElementById(idUnits).value, 10);
+          const mm = document.getElementById(idExp).value; // yyyy-mm
+          if (!d || !n || !mm || Number.isNaN(u)) { alert('Please fill Description, Item Number, Units and Expiry.'); return; }
+          const [yy,mmPart] = mm.split('-').map(x=>parseInt(x,10));
+          const idx = DATA.findIndex(x=> x.id === it.id);
+          if (idx !== -1){ DATA[idx] = { ...DATA[idx], desc:d, sku:s, number:n, location:l, units:u, y:yy, m:mmPart-1 }; save(); }
+          renderTable();
+        });
+        tr.querySelector('[data-action="cancel"]').addEventListener('click', ()=> renderTable());
+        tr.querySelector('[data-action="del"]').addEventListener('click', ()=> deleteItem(it.id));
+      }
+
+      renderRead();
+      return tr;
+    }
+
+    function escapeHtml(s){ return s.replace(/[&<>\"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]) ); }
+
+    // Excel dictionary import (via SheetJS)
+    const excelPicker = document.getElementById('excelPicker');
+    const importExcelBtn = document.getElementById('importExcel');
+    if (importExcelBtn) {
+      importExcelBtn.addEventListener('click', ()=> excelPicker.click());
+    }
+    if (excelPicker) {
+      excelPicker.addEventListener('change', async (e)=>{
+        const file = e.target.files?.[0]; if (!file) return;
+        try {
+          const dict = await parseExcelDictionary(file);
+          DICT = dict;
+          localStorage.setItem(DICT_KEY, JSON.stringify(DICT));
+          rebuildLookups();
+          // Offer a generated dictionaries.js for future offline usage
+          const js = 'window.DICT = ' + JSON.stringify(DICT, null, 2) + ';\n';
+          const blob = new Blob([js], {type:'application/javascript'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'dictionaries.js'; a.click();
+          URL.revokeObjectURL(url);
+          alert('Dictionary imported. A dictionaries.js file has been downloaded—place it next to this HTML.');
+        } catch(err){
+          console.error(err);
+          alert('Failed to import Excel: ' + (err?.message||err));
+        } finally { excelPicker.value=''; }
+      });
+    }
+
+    async function parseExcelDictionary(file){
+      if (typeof XLSX === 'undefined') throw new Error('Excel parser is not loaded.');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type:'array' });
+      const sheets = wb.SheetNames || [];
+      if (!sheets.length) return { items: [], stores: [] };
+      const findSheet = (regex, fallbackIdx=0)=> sheets.find(n=> regex.test(n)) || sheets[fallbackIdx];
+
+      const itemsSheet = wb.Sheets[findSheet(/items?/i, 0)];
+      const storesSheetName = sheets.find(n=> /stores?|locations?/i.test(n));
+      const storesSheet = storesSheetName ? wb.Sheets[storesSheetName] : null;
+
+      const itemsRows = XLSX.utils.sheet_to_json(itemsSheet, { defval: '' });
+      const storesRows = storesSheet ? XLSX.utils.sheet_to_json(storesSheet, { defval: '' }) : [];
+
+      const descKeys = ['item description','description','desc','name','item'];
+      const skuKeys  = ['item sku','sku'];
+      const numKeys  = ['item number','number','item #','item no','item no.','itemno','item code','code'];
+      const locKeys  = ['item location','location','store','site','branch','warehouse'];
+
+      const norm = obj => Object.fromEntries(Object.entries(obj).map(([k,v])=> [String(k).toLowerCase().trim(), v]));
+      const pick = (o, keys)=>{ for (const kk of keys){ if (o.hasOwnProperty(kk)) { const val = o[kk]; if (val !== undefined && val !== null && String(val).trim()!=='') return val; } } return ''; };
+
+      const itemsMap = new Map();
+      for (const r0 of itemsRows){
+        const r = norm(r0);
+        const desc = pick(r, descKeys);
+        if (!desc) continue;
+        const sku = pick(r, skuKeys);
+        const number = pick(r, numKeys);
+        const key = String(desc).trim();
+        const lk = key.toLowerCase();
+        if (!itemsMap.has(lk)) itemsMap.set(lk, { desc: key, sku: String(sku||''), number: String(number||'') });
+      }
+
+      const storeSet = new Set();
+      for (const r0 of storesRows){
+        const r = norm(r0); const s = pick(r, locKeys); if (s) storeSet.add(String(s).trim());
+      }
+      if (!storeSet.size){
+        for (const r0 of itemsRows){
+          const r = norm(r0); const s = pick(r, locKeys); if (s) storeSet.add(String(s).trim());
+        }
+      }
+
+      const items = [...itemsMap.values()].sort((a,b)=> a.desc.localeCompare(b.desc));
+      const stores = [...storeSet].filter(Boolean).sort((a,b)=> a.localeCompare(b));
+      return { items, stores };
+    }
+
+    // CSV dictionary import (items + optional stores)
+    const dictCsvPicker = document.getElementById('dictCsvPicker');
+    const importDictCsvBtn = document.getElementById('importDictCsv');
+    if (importDictCsvBtn) {
+      importDictCsvBtn.addEventListener('click', ()=> dictCsvPicker.click());
+    }
+    if (dictCsvPicker) {
+      dictCsvPicker.addEventListener('change', async (e)=>{
+        const file = e.target.files?.[0]; if (!file) return;
+        try {
+          const text = await file.text();
+          const rows = parseCSV(text);
+          const { items, stores } = buildDictionaryFromRows(rows);
+          // Merge with any existing stores
+          const mergedStores = [...new Set([...(Array.isArray(DICT.stores)?DICT.stores:[]), ...stores])].filter(Boolean).sort((a,b)=> a.localeCompare(b));
+          DICT = { items, stores: mergedStores };
+          localStorage.setItem(DICT_KEY, JSON.stringify(DICT));
+          rebuildLookups();
+          const js = 'window.DICT = ' + JSON.stringify(DICT, null, 2) + ';\n';
+          const blob = new Blob([js], {type:'application/javascript'});
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'dictionaries.js'; a.click();
+          URL.revokeObjectURL(url);
+          alert('Dictionary (CSV) imported. A dictionaries.js file has been downloaded—place it next to this HTML.');
+        } catch(err){
+          console.error(err);
+          alert('Failed to import CSV dictionary: ' + (err?.message||err));
+        } finally { dictCsvPicker.value=''; }
+      });
+    }
+
+    function buildDictionaryFromRows(rows){
+      const descKeys = ['item description','description','desc','name','item'];
+      const skuKeys  = ['item sku','sku'];
+      const numKeys  = ['item number','number','item #','item no','item no.','itemno','item code','code'];
+      const locKeys  = ['item location','location','store','site','branch','warehouse'];
+
+      const norm = obj => Object.fromEntries(Object.entries(obj).map(([k,v])=> [String(k).toLowerCase().trim(), v]));
+      const pick = (o, keys)=>{ for (const kk of keys){ if (Object.prototype.hasOwnProperty.call(o, kk)) { const val = o[kk]; if (val !== undefined && val !== null && String(val).trim()!=='') return val; } } return ''; };
+
+      const itemsMap = new Map();
+      const storeSet = new Set();
+      for (const r0 of rows){
+        const r = norm(r0);
+        const desc = pick(r, descKeys);
+        const sku = pick(r, skuKeys);
+        const number = pick(r, numKeys);
+        const loc = pick(r, locKeys);
+        if (desc){
+          const key = String(desc).trim();
+          const lk = key.toLowerCase();
+          if (!itemsMap.has(lk)) itemsMap.set(lk, { desc: key, sku: String(sku||''), number: String(number||'') });
+        }
+        if (loc) storeSet.add(String(loc).trim());
+      }
+      const items = [...itemsMap.values()].sort((a,b)=> a.desc.localeCompare(b.desc));
+      const stores = [...storeSet].filter(Boolean).sort((a,b)=> a.localeCompare(b));
+      return { items, stores };
+    }
+
+    /***************************
+     * Quick Add dialog
+     ***************************/
+    const dlg = document.getElementById('quickDlg');
+    document.getElementById('addQuick').addEventListener('click', ()=>{ dlg.showModal(); document.getElementById('qdesc').focus(); });
+    document.getElementById('closeQuick').addEventListener('click', ()=> dlg.close());
+    document.getElementById('quickForm').addEventListener('submit', e=>{
+      e.preventDefault();
+      const desc=document.getElementById('qdesc').value.trim();
+      const sku=document.getElementById('qsku').value.trim();
+      const number=document.getElementById('qnumber').value.trim();
+      const location=document.getElementById('qlocation').value.trim();
+      const units=parseInt(document.getElementById('qunits').value,10);
+      const mm=document.getElementById('qexpiry').value; // yyyy-mm
+      if (!desc || !number || !mm || isNaN(units)) return;
+      const [y,m]=mm.split('-').map(n=>parseInt(n,10));
+      DATA.push({ id: uid(), desc, sku, number, location, units, y, m: m-1 });
+      save(); renderTable(); dlg.close();
+      document.getElementById('quickForm').reset();
+    });
+
+    /***************************
+     * Clear all
+     ***************************/
+    document.getElementById('clearAll').addEventListener('click', ()=>{
+      if (!confirm('This clears ALL saved data. Continue?')) return;
+      DATA = []; save(); renderTable();
+    });
+
+    /***************************
+     * Boot
+     ***************************/
+    async function boot(){
+      await load();
+      await loadStoreList();  // Make sure stores are loaded first
+      rebuildLookups();
+      renderCarousel();
+      renderTable();
+    }
+
+    boot().catch(console.error);
+  </script>
+</body>
+</html>
